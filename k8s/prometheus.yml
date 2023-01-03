@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+    name: prometheus-data-pvc
+spec:
+    accessModes:
+        - ReadWriteMany
+    resources:
+        requests:
+            storage: 1Gi
+    storageClassName: microk8s-hostpath
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: prometheus-config
+data:
+    prometheus.yml: |
+        global:
+            scrape_interval: 15s
+            evaluation_interval: 15s
+        scrape_configs:
+            -
+                job_name: prometheus
+                static_configs:
+                    -
+                        targets: ["localhost:9090"]
+        
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    labels:
+        app: prometheus 
+    name: prometheus 
+spec:
+    selector:
+        matchLabels:
+            app: prometheus 
+    template:
+        metadata:
+            labels:
+                app: prometheus 
+        spec:
+            securityContext:
+                fsGroup: 472
+                supplementalGroups:
+                    - 0
+            containers:
+                -
+                    name: prometheus 
+                    image: prom/prometheus:v2.41.0
+                    imagePullPolicy: IfNotPresent
+                    ports:
+                        -
+                            containerPort: 9090 
+                            name: http-prometheus
+                            protocol: TCP
+                    resources:
+                        requests:
+                            cpu: 250m
+                            memory: 750Mi
+                    volumeMounts:
+                        -
+                            mountPath: /etc/prometheus
+                            name: prometheus-config-pv
+                        -
+                            mountPath: /prometheus
+                            name: prometheus-data-pv
+            volumes:
+                -
+                    name: prometheus-config-pv
+                    configMap:
+                        defaultMode: 420
+                        name: prometheus-config
+                -
+                    name: prometheus-data-pv
+                    persistentVolumeClaim:
+                        claimName: prometheus-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+    name: prometheus 
+spec:
+    ports:
+        -
+            port: 9090 
+            protocol: TCP
+            targetPort: http-prometheus
+    selector:
+        app: prometheus 
+    sessionAffinity: None
+    type: LoadBalancer 
