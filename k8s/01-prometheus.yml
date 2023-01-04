@@ -8,7 +8,7 @@ spec:
     resources:
         requests:
             storage: 1Gi
-    storageClassName: microk8s-hostpath
+    storageClassName: nfs-csi 
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -34,6 +34,12 @@ metadata:
         app: prometheus 
     name: prometheus 
 spec:
+    replicas: 1
+    strategy:
+        rollingUpdate:
+            maxSurge: 1
+            maxUnavailable: 1
+        type: RollingUpdate
     selector:
         matchLabels:
             app: prometheus 
@@ -43,19 +49,35 @@ spec:
                 app: prometheus 
         spec:
             securityContext:
-                fsGroup: 472
-                supplementalGroups:
-                    - 0
+                fsGroup: 1001
             containers:
                 -
                     name: prometheus 
-                    image: prom/prometheus:v2.41.0
+                    image: bitnami/prometheus:latest
                     imagePullPolicy: IfNotPresent
                     ports:
                         -
                             containerPort: 9090 
                             name: http-prometheus
                             protocol: TCP
+                    readinessProbe:
+                        failureThreshold: 3
+                        httpGet:
+                            path: /graph
+                            port: 9090
+                            scheme: HTTP
+                        initialDelaySeconds: 10
+                        periodSeconds: 30
+                        successThreshold: 1
+                        timeoutSeconds: 2
+                    livenessProbe:
+                        failureThreshold: 3
+                        initialDelaySeconds: 30
+                        periodSeconds: 10
+                        successThreshold: 1
+                        tcpSocket:
+                            port: 9090
+                        timeoutSeconds: 1
                     resources:
                         requests:
                             cpu: 250m
@@ -65,7 +87,7 @@ spec:
                             mountPath: /etc/prometheus
                             name: prometheus-config-pv
                         -
-                            mountPath: /prometheus
+                            mountPath: /opt/bitnami/prometheus/data
                             name: prometheus-data-pv
             volumes:
                 -

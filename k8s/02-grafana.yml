@@ -9,7 +9,7 @@ spec:
     resources:
         requests:
             storage: 1Gi
-    storageClassName: microk8s-hostpath
+    storageClassName: nfs-csi
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -18,6 +18,12 @@ metadata:
         app: grafana
     name: grafana
 spec:
+    replicas: 1
+    strategy:
+        rollingUpdate:
+            maxSurge: 1
+            maxUnavailable: 1
+        type: RollingUpdate
     selector:
         matchLabels:
             app: grafana
@@ -33,7 +39,7 @@ spec:
             containers:
                 -
                     name: grafana
-                    image: grafana/grafana:8.4.4
+                    image: grafana/grafana:latest
                     imagePullPolicy: IfNotPresent
                     ports:
                         -
